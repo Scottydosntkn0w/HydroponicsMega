@@ -1,5 +1,6 @@
 #include <Arduino.h>
 
+
 #define LED_PIN 13
 #define BLINK_DELAY 100
 
@@ -46,6 +47,11 @@ int range_ph_low = 5.5;
 int range_ph_high_danger = 7.0;
 int range_ph_low_danger = 5.0;
 
+unsigned long startTime = millis();
+unsigned long waterADJDelay = 300000;
+unsigned long timeOfADJ = millis();
+unsigned long DurationSinceADJ = 0;
+
 void setup() {
   Serial.begin(9600);
 
@@ -57,6 +63,7 @@ void setup() {
   pinMode(P_pump4Pin, OUTPUT);
   pinMode(P_pump4Pin, INPUT);
 
+
 }
 
 void loop() {
@@ -67,6 +74,8 @@ void loop() {
   TEMPsensorValue = analogRead(TEMPsensorPin);
   POWERsensorValue = analogRead(POWERsensorPin);
   WaterLevelState = digitalRead(WaterLevelPin);
+
+  DurationSinceADJ = millis() - timeOfADJ;
 
 /* 
 if(PHsensorValue == 0 or ECsensorValue == 0){
@@ -81,27 +90,43 @@ if(PHsensorValue == 0 or ECsensorValue == 0){
 }
  */
 
-if(PHsensorValue < range_ph_low){ // add base
-  digitalWrite(P_pump2Pin,HIGH);
-  delay(3000);
-  digitalWrite(P_pump2Pin,LOW);
+
+//water adjustment code
+if( startTime > 300000 && DurationSinceADJ > waterADJDelay){
+
+
+  if(ECsensorValue < range_ec_low){ // add nutriants
+    digitalWrite(P_pump3Pin,HIGH);
+    delay(3000);
+    digitalWrite(P_pump3Pin,LOW);
+    timeOfADJ = millis();
+  }
+  // else(ECsensorValue > range_ec_high){ 
+  //   //TODO
+    
+  // }
+  else if (PHsensorValue < range_ph_low){ // add base
+    digitalWrite(P_pump2Pin,HIGH);
+    delay(3000);
+    digitalWrite(P_pump2Pin,LOW);
+    timeOfADJ = millis();
+  }
+  else if (PHsensorValue > range_ph_high){ // add acid
+    digitalWrite(P_pump1Pin,HIGH);
+    delay(3000);
+    digitalWrite(P_pump1Pin,LOW);
+    timeOfADJ = millis();
+  }
 }
 
-if(PHsensorValue > range_ph_high){ // add acid
-  digitalWrite(P_pump1Pin,HIGH);
-  delay(3000);
-  digitalWrite(P_pump1Pin,LOW);
-}
+//
 
-if(ECsensorValue < range_ec_low){ // add nutriants
-  digitalWrite(P_pump3Pin,HIGH);
-  delay(3000);
-  digitalWrite(P_pump3Pin,LOW);
-}
-
-if(ECsensorValue > range_ec_high){ 
-  //TODO
-}
+//code to control lights
+//todo
+//code to control pump
+//todo
+//code to communicate with esp32
+//report (flow, ph, ec, temp, power, water level)
 
 
 
