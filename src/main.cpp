@@ -5,21 +5,25 @@
 #define LED_PIN 13
 #define BLINK_DELAY 100
 
+char c;
+String dataIn;
+
+
 int n = 0;
 
-//Analog Inputs
-int pHsensorPin = A0;
-int PHsensorValue = 0;
+
 //Digital Outputs
-int lightPin = 22;
-int waterPumpPin = 23;
-int P_pump1Pin = 24;
-int P_pump2Pin = 25;
-int P_pump3Pin = 26;
-int P_pump4Pin = 27;
+int lightPin = 22; //Relay1
+int waterPumpPin = 23; //Relay2
+int P_pump1Pin = 24; //Relay3
+int P_pump2Pin = 25; //Relay4
+int P_pump3Pin = 26; //Relay5
+int P_pump4Pin = 27; //Relay6
+
 //Digital Inputs
-int WaterLevelPin = 28;
+int WaterLevelPin = 44;
 int WaterLevelState = 0;
+
 //Analog Inputs
 //Flow Meter
 int FLOWsensorPin = A0;
@@ -49,12 +53,18 @@ int range_ph_high_danger = 7.0;
 int range_ph_low_danger = 5.0;
 
 unsigned long startTime = millis();
-unsigned long waterADJDelay = 300000;
+unsigned long waterADJDelay = 60000;//300000;
 unsigned long timeOfADJ = millis();
 unsigned long DurationSinceADJ = 0;
+unsigned long DurationSinceSerialSend = 0;
+unsigned long SerialSendDelay = 1000;
+unsigned long timeOfSerialSend = millis();
+
+
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(19200);
+  Serial1.begin(9600);
 
   pinMode(lightPin, OUTPUT);
   pinMode(waterPumpPin, OUTPUT);
@@ -62,7 +72,16 @@ void setup() {
   pinMode(P_pump2Pin, OUTPUT);
   pinMode(P_pump3Pin, OUTPUT);
   pinMode(P_pump4Pin, OUTPUT);
-  pinMode(P_pump4Pin, INPUT);
+  pinMode(WaterLevelPin, INPUT);
+
+  //Report Parameters
+  Serial1.println("parameter/SerialSendDelay: " + SerialSendDelay);
+  Serial1.println("parameter/waterADJDelay: " + waterADJDelay);
+  Serial1.println("parameter/range_ec_high: " + range_ec_high);
+  Serial1.println("parameter/range_ec_low: " + range_ec_low);
+  Serial1.println("parameter/range_ph_high: " + range_ph_high);
+  Serial1.println("parameter/range_ph_low: " + range_ph_low);
+
 
 
 }
@@ -77,6 +96,12 @@ void loop() {
   WaterLevelState = digitalRead(WaterLevelPin);
 
   DurationSinceADJ = millis() - timeOfADJ;
+  DurationSinceSerialSend = millis() - timeOfSerialSend;
+
+  String Sensor_Readings = "Flow: " + String(FLOWsensorValue) +",PH: "+ PHsensorValue +",EC: "+ ECsensorValue +",TEMP: " + TEMPsensorValue + ",Power: "+ POWERsensorValue +",WaterLevel: "+ WaterLevelState +",Light: "+ digitalRead(lightPin) +",Water Pump: "+ digitalRead(waterPumpPin);
+
+ 
+
 
 /* 
 if(PHsensorValue == 0 or ECsensorValue == 0){
@@ -92,33 +117,68 @@ if(PHsensorValue == 0 or ECsensorValue == 0){
  */
 
 
-//water adjustment code
-if( startTime > 300000 && DurationSinceADJ > waterADJDelay){
+  //water adjustment code
+  //if( startTime > 300000 && DurationSinceADJ > waterADJDelay){
+  if( millis() > 3000 && DurationSinceADJ > waterADJDelay){
+
+    if(ECsensorValue < range_ec_low){ // add nutriants
+      digitalWrite(P_pump3Pin,HIGH);
+      Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
+      Serial1.println("output/pump3: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
+      delay(3000);
+      digitalWrite(P_pump3Pin,LOW);
+      Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
+      Serial1.println("output/pump3: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
+      timeOfADJ = millis();
+    }
+    // else(ECsensorValue > range_ec_high){ 
+    //   //TODO
+      
+    // }
+    else if (PHsensorValue < range_ph_low){ // add base
+      digitalWrite(P_pump2Pin,HIGH);
+      Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
+      Serial1.println("output/pump2: " + String(digitalRead(P_pump2Pin))); //Send data to ESP32
+      delay(3000);
+      digitalWrite(P_pump2Pin,LOW);
+      Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
+      Serial1.println("output/pump2: " + String(digitalRead(P_pump2Pin))); 
+      timeOfADJ = millis();
+    }
+    else if (PHsensorValue > range_ph_high){ // add acid
+      digitalWrite(P_pump1Pin,HIGH);
+      Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
+      Serial1.println("output/pump1: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
+      delay(3000);
+      digitalWrite(P_pump1Pin,LOW);
+      Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
+      Serial1.println("output/pump1: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
+      timeOfADJ = millis();
+    }
+  }
 
 
-  if(ECsensorValue < range_ec_low){ // add nutriants
-    digitalWrite(P_pump3Pin,HIGH);
-    delay(3000);
-    digitalWrite(P_pump3Pin,LOW);
-    timeOfADJ = millis();
+
+
+  if(DurationSinceSerialSend > SerialSendDelay)
+  {
+
+
+
+    Serial.println(Sensor_Readings);
+    Serial1.println("sensor/Flow: " + String(FLOWsensorValue)); //Send data to ESP32
+    Serial1.println("sensor/PH: "+ String(PHsensorValue)); //Send data to ESP32
+    Serial1.println("sensor/EC: "+ String(ECsensorValue));
+    Serial1.println("sensor/TEMP: " + String(TEMPsensorValue));
+    Serial1.println("sensor/Power: "+ String(POWERsensorValue));
+    Serial1.println("sensor/WaterLevel: "+ String(WaterLevelState));
+    Serial1.println("output/Light/state: "+ String(digitalRead(lightPin)));
+    Serial1.println("output/Water Pump/state: "+ String(digitalRead(waterPumpPin)));
+
+    timeOfSerialSend = millis();
+
   }
-  // else(ECsensorValue > range_ec_high){ 
-  //   //TODO
-    
-  // }
-  else if (PHsensorValue < range_ph_low){ // add base
-    digitalWrite(P_pump2Pin,HIGH);
-    delay(3000);
-    digitalWrite(P_pump2Pin,LOW);
-    timeOfADJ = millis();
-  }
-  else if (PHsensorValue > range_ph_high){ // add acid
-    digitalWrite(P_pump1Pin,HIGH);
-    delay(3000);
-    digitalWrite(P_pump1Pin,LOW);
-    timeOfADJ = millis();
-  }
-}
+
 
 //
 
@@ -126,7 +186,24 @@ if( startTime > 300000 && DurationSinceADJ > waterADJDelay){
 //todo
 //code to control pump
 //todo
+
 //code to communicate with esp32
+  while (Serial1.available())
+  {
+    c = Serial1.read(); //Read the incoming data and save to c variable, once character at a time
+
+    if(c != '\n') { dataIn += c; } //If the End Data Identifier ('\n') not found, then append data c to the string variable dataIn
+    else          { break;}        //If the end Data identifier ('\n') is found, break while loop  }
+
+
+  if(dataIn != "")
+    {
+      Serial.println(dataIn);
+      c=0;
+      dataIn="";
+    }
+  }
+
 //report (flow, ph, ec, temp, power, water level)
 
 
