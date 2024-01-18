@@ -32,8 +32,9 @@ int WaterLevelState = 0;
 
 //Analog Inputs
 //Flow Meter
-int FLOWsensorPin = A0;
-int FLOWsensorValue = 0;
+const byte interruptPin = 2; 
+volatile double waterFlow = LOW;
+
 //PH Meter
 DFRobot_PH ph;
 uint16_t voltagePH;
@@ -86,6 +87,7 @@ void setup() {
   pinMode(P_pump3Pin, OUTPUT);
   pinMode(P_pump4Pin, OUTPUT);
   pinMode(WaterLevelPin, INPUT);
+  pinMode(interruptPin, INPUT_PULLUP);
 
   //Report State
   prev_Mode = "Manual";
@@ -122,6 +124,8 @@ void setup() {
 
   ph.begin();
 
+  waterFlow = 0;
+  attachInterrupt(digitalPinToInterrupt(interruptPin), pulse, RISING);  //DIGITAL Pin 2: Interrupt 0
 
 
 
@@ -136,15 +140,13 @@ void loop() {
 
   voltagePH = analogRead(PH_PIN)/1024.0*5000;
   phValue = ph.readPH(voltagePH,Temp);
-
-  FLOWsensorValue = analogRead(FLOWsensorPin);
   POWERsensorValue = analogRead(POWERsensorPin);
   WaterLevelState = digitalRead(WaterLevelPin);
 
   DurationSinceADJ = millis() - timeOfADJ;
   DurationSinceSerialSend = millis() - timeOfSerialSend;
 
-  String Sensor_Readings = "Flow: " + String(FLOWsensorValue) +",PH: "+ phValue +",EC: "+ Conductivity +",TEMP: " + Temp + ",Power: "+ POWERsensorValue +",WaterLevel: "+ WaterLevelState +",Light: "+ digitalRead(lightPin) +",Water Pump: "+ digitalRead(waterPumpPin);
+  String Sensor_Readings = "Flow: " + String(waterFlow) +",PH: "+ phValue +",EC: "+ Conductivity +",TEMP: " + Temp + ",Power: "+ POWERsensorValue +",WaterLevel: "+ WaterLevelState +",Light: "+ digitalRead(lightPin) +",Water Pump: "+ digitalRead(waterPumpPin);
 
 
   if (Mode == "Manual")
@@ -218,7 +220,7 @@ void loop() {
 
 
     Serial.println(Sensor_Readings);
-    Serial1.println("sensor/Flow: " + String(FLOWsensorValue)); //Send data to ESP32
+    Serial1.println("sensor/Flow: " + String(waterFlow)); //Send data to ESP32
     Serial1.println("sensor/PH: "+ String(phValue)); //Send data to ESP32
     Serial1.println("sensor/EC: "+ String(Conductivity));
     Serial1.println("sensor/EC_Input_Voltage: "+ String(EC_Voltage));
@@ -313,4 +315,10 @@ void loop() {
     c=0;
     dataIn="";
   }
+}
+
+
+void pulse()   //measure the quantity of square wave
+{
+  waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
 }
