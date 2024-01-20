@@ -76,6 +76,11 @@ String Mode;
 String prev_Mode;
 
 
+void pulse()   //measure the quantity of square wave
+{
+  waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
+}
+
 void setup() {
   Serial.begin(19200);
   Serial1.begin(9600);
@@ -118,7 +123,7 @@ void setup() {
   Serial1.println("output/pump4/state: "+ String(digitalRead(P_pump4Pin)));
 
 
-  ec.setCalibration(1);//Replace the 1 with the calibrated K value if it's calibrated
+  ec.setCalibration(1.0572);//Replace the 1 with the calibrated K value if it's calibrated
   Serial.println("Default Calibration K=" + String(ec.getCalibration()));
   Serial1.println("parameter/EC_K: " + String(ec.getCalibration()));
 
@@ -318,7 +323,3 @@ void loop() {
 }
 
 
-void pulse()   //measure the quantity of square wave
-{
-  waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
-}
