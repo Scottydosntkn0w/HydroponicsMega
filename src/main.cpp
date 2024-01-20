@@ -75,6 +75,10 @@ unsigned long timeOfSerialSend = millis();
 String Mode;
 String prev_Mode;
 
+void pulse()   //measure the quantity of square wave
+{
+  waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
+}
 
 void setup() {
   Serial.begin(19200);
@@ -318,7 +322,3 @@ void loop() {
 }
 
 
-void pulse()   //measure the quantity of square wave
-{
-  waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
-}
