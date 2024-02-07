@@ -94,7 +94,7 @@ void setup() {
   pinMode(P_pump2Pin, OUTPUT);
   pinMode(P_pump3Pin, OUTPUT);
   pinMode(P_pump4Pin, OUTPUT);
-  pinMode(WaterLevelPin, INPUT_PULLUP);
+  pinMode(WaterLevelPin, INPUT);
   pinMode(interruptPin, INPUT_PULLUP);
 
   //Report State
