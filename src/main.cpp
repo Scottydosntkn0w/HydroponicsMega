@@ -157,20 +157,10 @@ void loop() {
   String Sensor_Readings = "Flow: " + String(waterFlow) +",PH: "+ phValue +",EC: "+ Conductivity +",TEMP: " + Temp + ",Power: "+ POWERsensorValue +",WaterLevel: "+ WaterLevelState +",Light: "+ digitalRead(lightPin) +",Water Pump: "+ digitalRead(waterPumpPin);
 
 
-  if (Mode == "Manual")
-  {
-    if (prev_Mode == "Auto")
-    {
-      prev_Mode = "Manual";
-    }
-    
-    /* code */
-  }
+  if (Mode == "Manual"){prev_Mode = manualModeLoop(prev_Mode);}
   
-  
+  if (Mode == "Auto"){
 
-  //water adjustment code
-  if(Mode == "Auto"){
     if (prev_Mode == "Manual")
     {
       digitalWrite(lightPin,HIGH);
@@ -179,43 +169,19 @@ void loop() {
       prev_Mode = "Auto";
     }
     
-
-  //if( startTime > 300000 && DurationSinceADJ > waterADJDelay){
-    if(millis() > 300000 && DurationSinceADJ > waterADJDelay){
-
-      if(Conductivity < range_ec_low){ AddNutriant();}
-        
-      else if (phValue < range_ph_low){ 
-        digitalWrite(P_pump2Pin,HIGH);
-        Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
-        Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); //Send data to ESP32
-        delay(3000);
-        digitalWrite(P_pump2Pin,LOW);
-        Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
-        Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); 
-        timeOfADJ = millis();
-      }
-      else if (phValue > range_ph_high){ // add acid
-        digitalWrite(P_pump1Pin,HIGH);
-        Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
-        Serial1.println("output/pump1/state: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
-        delay(3000);
-        digitalWrite(P_pump1Pin,LOW);
-        Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
-        Serial1.println("output/pump1/state: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
-        timeOfADJ = millis();
-      }
-      timeOfADJ = millis();
+    if(millis() > 300000 && DurationSinceADJ > waterADJDelay)
+    {
+      if(Conductivity < range_ec_low){ AddNutriant();timeOfADJ = millis();}
+      else if (phValue < range_ph_low){ RaisePH();timeOfADJ = millis();}
+      else if (phValue > range_ph_high){ LowerPH;timeOfADJ = millis();}
     }
+
   }
 
 
 //report (flow, ph, ec, temp, power, water level)
   if(DurationSinceSerialSend > SerialSendDelay)
   {
-
-
-
     Serial.println(Sensor_Readings);
     Serial1.println("sensor/Flow: " + String(waterFlow)); //Send data to ESP32
     Serial1.println("sensor/PH: "+ String(phValue)); //Send data to ESP32
@@ -231,12 +197,7 @@ void loop() {
     Serial1.println("output/pump3/state: "+ String(digitalRead(P_pump3Pin)));
     Serial1.println("output/pump4/state: "+ String(digitalRead(P_pump4Pin)));
 
-    
-    
-
-
     timeOfSerialSend = millis();
-
   }
 
 
@@ -269,52 +230,34 @@ void loop() {
     }
     if (Mode == "Manual")
     {
-      if (Name == "LightCMD")
-      {
-        if (Val == "1"){digitalWrite(lightPin,HIGH);}
-        if (Val == "0"){digitalWrite(lightPin,LOW);}
-        Serial1.println("sensor/LightCMD: "+ String(WaterLevelState));
-      }
+      if (Name == "LightCMD"){ SerialtoDigitalWrite(Val,lightPin);}
+      //Serial1.println("sensor/LightCMD: "+ String(WaterLevelState));
 
-      if (Name == "Water Pump CMD")
-      {
-        if (Val == "1"){digitalWrite(waterPumpPin,HIGH);}
-        if (Val == "0"){digitalWrite(waterPumpPin,LOW);}
-      }
-
-      if (Name == "pump1CMD")
-      {
-        if (Val == "1"){digitalWrite(P_pump1Pin,HIGH);}
-        if (Val == "0"){digitalWrite(P_pump1Pin,LOW);}
-      }
-
-      if (Name == "pump2CMD")
-      {
-        if (Val == "1"){digitalWrite(P_pump2Pin,HIGH);}
-        if (Val == "0"){digitalWrite(P_pump2Pin,LOW);}
-      }
-
-      if (Name == "pump3CMD")
-      {
-        if (Val == "1"){digitalWrite(P_pump3Pin,HIGH);}
-        if (Val == "0"){digitalWrite(P_pump3Pin,LOW);}
-      }
-
-      if (Name == "pump4CMD")
-      {
-        if (Val == "1"){digitalWrite(P_pump4Pin,HIGH);}
-        if (Val == "0"){digitalWrite(P_pump4Pin,LOW);}
-      } 
-
-
-
+      if (Name == "Water Pump CMD"){ SerialtoDigitalWrite(Val,waterPumpPin);}
+      if (Name == "pump1CMD"){ SerialtoDigitalWrite(Val,P_pump1Pin);}
+      if (Name == "pump2CMD"){ SerialtoDigitalWrite(Val,P_pump2Pin);}
+      if (Name == "pump3CMD"){ SerialtoDigitalWrite(Val,P_pump3Pin);}
+      if (Name == "pump4CMD"){ SerialtoDigitalWrite(Val,P_pump4Pin);} 
     }
     c=0;
     dataIn="";
   }
 }
 
+String manualModeLoop(String prev_Mode)
+{
+  if (prev_Mode == "Auto")
+  {
+    prev_Mode = "Manual";
+  }
+  return prev_Mode;
+}
 
+void SerialtoDigitalWrite(String Val, int PinNumber)
+{
+  if (Val == "1"){digitalWrite(PinNumber,HIGH);}
+  if (Val == "0"){digitalWrite(PinNumber,LOW);}
+} 
 
 void AddNutriant()
 {
@@ -326,10 +269,25 @@ void AddNutriant()
   Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
   Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
 }
-
-
-
-
+void RaisePH()
+{
+  digitalWrite(P_pump2Pin,HIGH);
+  Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
+  Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); //Send data to ESP32
+  delay(3000);
+  digitalWrite(P_pump2Pin,LOW);
+  Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
+  Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); 
+}
+void LowerPH()
+{
+  digitalWrite(P_pump1Pin,HIGH);
+  Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
+  Serial1.println("output/pump1/state: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
+  delay(3000);
+  digitalWrite(P_pump1Pin,LOW);
+  Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
+}
 void pulse()   //measure the quantity of square wave
 {
   waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
