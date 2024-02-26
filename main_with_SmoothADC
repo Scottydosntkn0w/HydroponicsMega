@@ -6,10 +6,19 @@
 #include <SmoothADC.h>
 
 
+SmoothADC		ADC_1;				// SmoothADC instance for Pin 0
+SmoothADC		ADC_2;				// SmoothADC instance for Pin 1
+SmoothADC		ADC_3;				// SmoothADC instance for Pin 1
 
-#define PH_PIN A1
-#define EC_PIN A2
-#define TE_PIN A3
+unsigned int	ADC1Value = 0;		// ADC0 final value
+unsigned int	ADC2Value = 0;		// ADC1 final value
+unsigned int	ADC3Value = 0;		// ADC1 final value
+
+unsigned int	MemTimeSerial;
+
+//#define PH_PIN = ADC_1
+//#define EC_PIN = ADC_2
+//#define TE_PIN = ADC_3
 
 
 
@@ -73,7 +82,7 @@ unsigned long waterADJDelay = 300000;//300000;
 unsigned long timeOfADJ = millis();
 unsigned long DurationSinceADJ = 0;
 unsigned long DurationSinceSerialSend = 0;
-unsigned long SerialSendDelay = 30000;
+unsigned long SerialSendDelay = 1000;
 unsigned long timeOfSerialSend = millis();
 String Mode;
 String prev_Mode;
@@ -94,8 +103,15 @@ void setup() {
   pinMode(P_pump2Pin, OUTPUT);
   pinMode(P_pump3Pin, OUTPUT);
   pinMode(P_pump4Pin, OUTPUT);
-  pinMode(WaterLevelPin, INPUT_PULLUP);
+  pinMode(WaterLevelPin, INPUT);
   pinMode(interruptPin, INPUT_PULLUP);
+
+  ADC_1.init(A1, TB_MS, 200);
+  if (ADC_1.isDisabled()) {ADC_1.enable();}
+  ADC_2.init(A2, TB_MS, 200);
+  if (ADC_2.isDisabled()) {ADC_2.enable();}
+  ADC_3.init(A3, TB_MS, 200);
+  if (ADC_3.isDisabled()) {ADC_3.enable();}
 
   //Report State
   prev_Mode = "Manual";
@@ -140,13 +156,49 @@ void setup() {
 }
 
 void loop() {
+  
+  unsigned int tempTime = millis();
+  String toSerial = "";
 
-  EC_Voltage = (uint32_t)analogRead(EC_PIN) * 5000 / 1024;
-  TE_Voltage = (uint32_t)analogRead(TE_PIN) * 5000 / 1024;
+  ADC_1.serviceADCPin();
+  ADC_2.serviceADCPin();
+  ADC_3.serviceADCPin();
+
+  if ((tempTime - MemTimeSerial) > 1000)
+  {
+    MemTimeSerial = tempTime;
+
+    #ifdef DEBUG
+
+    ADC_1.dbgInfo();
+    ADC_2.dbgInfo();
+    ADC_3.dbgInfo();
+
+    #endif
+
+    ADC1Value = ADC_1.getADCVal();
+    ADC2Value = ADC_2.getADCVal();
+    ADC3Value = ADC_3.getADCVal();
+
+    toSerial += "ADC Channel 1:\t";
+    toSerial += ADC1Value;
+    toSerial += "ADC Channel 2:\t";
+    toSerial += ADC2Value;
+    toSerial += "ADC Channel 3:\t";
+    toSerial += ADC3Value;
+    Serial.println(toSerial);
+
+  }
+
+  //#define PH_PIN = ADC_1
+  //#define EC_PIN = ADC_2
+  //#define TE_PIN = ADC_3
+  EC_Voltage = (uint32_t)analogRead(ADC2Value) * 5000 / 1024;
+  TE_Voltage = (uint32_t)analogRead(ADC3Value) * 5000 / 1024;
   Temp = ecpt.convVoltagetoTemperature_C((float)TE_Voltage/1000);
   Conductivity = ec.getEC_us_cm(EC_Voltage, Temp);
 
-  voltagePH = analogRead(PH_PIN)/1024.0*5000;
+  voltagePH = analogRead(ADC1Value)/1024.0*5000;
   phValue = ph.readPH(voltagePH,Temp);
   POWERsensorValue = analogRead(POWERsensorPin);
   WaterLevelState = digitalRead(WaterLevelPin);
@@ -181,11 +233,23 @@ void loop() {
     
 
   //if( startTime > 300000 && DurationSinceADJ > waterADJDelay){
-    if(millis() > 300000 && DurationSinceADJ > waterADJDelay){
+    if(millis() > 3000 && DurationSinceADJ > waterADJDelay){
 
-      if(Conductivity < range_ec_low){ AddNutriant();}
+      if(Conductivity < range_ec_low){ // add nutriants
+        digitalWrite(P_pump3Pin,HIGH);
+        Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
+        Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
+        delay(3000);
+        digitalWrite(P_pump3Pin,LOW);
+        Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
+        Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
+        timeOfADJ = millis();
+      }
+      // else(ECsensorValue > range_ec_high){ 
+      //   //TODO
         
-      else if (phValue < range_ph_low){ 
+      // }
+      else if (phValue < range_ph_low){ // add base
         digitalWrite(P_pump2Pin,HIGH);
         Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
         Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); //Send data to ESP32
@@ -205,7 +269,6 @@ void loop() {
         Serial1.println("output/pump1/state: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
         timeOfADJ = millis();
       }
-      timeOfADJ = millis();
     }
   }
 
@@ -315,22 +378,3 @@ void loop() {
 }
 
 
-
-void AddNutriant()
-{
-  digitalWrite(P_pump3Pin,HIGH);
-  Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
-  Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
-  delay(3000);
-  digitalWrite(P_pump3Pin,LOW);
-  Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
-  Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
-}
-
-
-
-
-void pulse()   //measure the quantity of square wave
-{
-  waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
-}
