@@ -70,7 +70,7 @@ unsigned long waterADJDelay = 300000;//300000;
 unsigned long timeOfADJ = millis();
 unsigned long DurationSinceADJ = 0;
 unsigned long DurationSinceSerialSend = 0;
-unsigned long SerialSendDelay = 1000;
+unsigned long SerialSendDelay = 30000;
 unsigned long timeOfSerialSend = millis();
 String Mode;
 String prev_Mode;
@@ -173,23 +173,11 @@ void loop() {
     
 
   //if( startTime > 300000 && DurationSinceADJ > waterADJDelay){
-    if(millis() > 3000 && DurationSinceADJ > waterADJDelay){
+    if(millis() > 300000 && DurationSinceADJ > waterADJDelay){
 
-      if(Conductivity < range_ec_low){ // add nutriants
-        digitalWrite(P_pump3Pin,HIGH);
-        Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
-        Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
-        delay(3000);
-        digitalWrite(P_pump3Pin,LOW);
-        Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
-        Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
-        timeOfADJ = millis();
-      }
-      // else(ECsensorValue > range_ec_high){ 
-      //   //TODO
+      if(Conductivity < range_ec_low){ AddNutriant();}
         
-      // }
-      else if (phValue < range_ph_low){ // add base
+      else if (phValue < range_ph_low){ 
         digitalWrite(P_pump2Pin,HIGH);
         Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
         Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); //Send data to ESP32
@@ -209,6 +197,7 @@ void loop() {
         Serial1.println("output/pump1/state: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
         timeOfADJ = millis();
       }
+      timeOfADJ = millis();
     }
   }
 
@@ -317,6 +306,18 @@ void loop() {
   }
 }
 
+
+
+void AddNutriant()
+{
+  digitalWrite(P_pump3Pin,HIGH);
+  Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
+  Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
+  delay(3000);
+  digitalWrite(P_pump3Pin,LOW);
+  Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
+  Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
+}
 
 void pulse()   //measure the quantity of square wave
 {
