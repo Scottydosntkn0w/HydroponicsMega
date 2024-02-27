@@ -3,7 +3,7 @@
 #include "DFRobot_ECPRO.h"
 #include "DFRobot_PH.h"
 #include <EEPROM.h>
-#include <SmoothADC.h>
+#include <movingAvg.h>
 
 
 
@@ -42,17 +42,17 @@ volatile double waterFlow = LOW;
 DFRobot_PH ph;
 uint16_t voltagePH;
 float phValue;
-
+movingAvg phAVG(10);
 //Electrical Conductivity Meter
 DFRobot_ECPRO ec;
 uint16_t EC_Voltage;
 float Conductivity;
-
+movingAvg ecAVG(10);
 //Temperature Sensor
 DFRobot_ECPRO_PT1000 ecpt;
 uint16_t TE_Voltage;
 float Temp;
-
+movingAvg TempAVG(10);
 //Power Meter
 int POWERsensorPin = A4;
 int POWERsensorValue = 0;
@@ -77,7 +77,8 @@ unsigned long SerialSendDelay = 1000;
 unsigned long timeOfSerialSend = millis();
 String Mode;
 String prev_Mode;
-
+int Temp20 = 6;
+float PHoffset = -2.85;
 void pulse()   //measure the quantity of square wave
 {
   waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
@@ -134,6 +135,11 @@ void setup() {
 
   waterFlow = 0;
   attachInterrupt(digitalPinToInterrupt(interruptPin), pulse, RISING);  //DIGITAL Pin 2: Interrupt 0
+  
+  
+  phAVG.begin();
+  ecAVG.begin();
+  TempAVG.begin();
 
 
 
@@ -143,11 +149,20 @@ void loop() {
 
   EC_Voltage = (uint32_t)analogRead(EC_PIN) * 5000 / 1024;
   TE_Voltage = (uint32_t)analogRead(TE_PIN) * 5000 / 1024;
+
   Temp = ecpt.convVoltagetoTemperature_C((float)TE_Voltage/1000);
+  Temp = Temp * 100;
+  Temp = float(TempAVG.reading(Temp))/100;
+  
   Conductivity = ec.getEC_us_cm(EC_Voltage, Temp);
+  Conductivity = float(ecAVG.reading(Conductivity));
 
   voltagePH = analogRead(PH_PIN)/1024.0*5000;
   phValue = ph.readPH(voltagePH,Temp);
+  phValue = phValue*100;
+  phValue = float(phAVG.reading(phValue))/100;
+  phValue = phValue + PHoffset;
+
   POWERsensorValue = analogRead(POWERsensorPin);
   WaterLevelState = digitalRead(WaterLevelPin);
 
