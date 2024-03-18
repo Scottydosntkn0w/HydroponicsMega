@@ -28,6 +28,8 @@ int P_pump1Pin = 24; //Relay3
 int P_pump2Pin = 25; //Relay4
 int P_pump3Pin = 26; //Relay5
 int P_pump4Pin = 27; //Relay6
+int EC_enable = 28; //Relay7
+
 
 //Digital Inputs
 int WaterLevelPin = 44;
@@ -77,8 +79,55 @@ unsigned long SerialSendDelay = 30000;
 unsigned long timeOfSerialSend = millis();
 String Mode;
 String prev_Mode;
-int Temp20 = 6;
+int Temp20 = 8;
 float PHoffset = -2.85;
+
+
+String manualModeLoop(String prev_Mode)
+{
+  if (prev_Mode == "Auto")
+  {
+    prev_Mode = "Manual";
+  }
+  return prev_Mode;
+}
+
+void SerialtoDigitalWrite(String Val, int PinNumber)
+{
+  if (Val == "1"){digitalWrite(PinNumber,HIGH);}
+  if (Val == "0"){digitalWrite(PinNumber,LOW);}
+} 
+
+void AddNutriant()
+{
+  digitalWrite(P_pump3Pin,HIGH);
+  Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
+  Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
+  delay(3000);
+  digitalWrite(P_pump3Pin,LOW);
+  Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
+  Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
+}
+void RaisePH()
+{
+  digitalWrite(P_pump2Pin,HIGH);
+  Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
+  Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); //Send data to ESP32
+  delay(3000);
+  digitalWrite(P_pump2Pin,LOW);
+  Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
+  Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); 
+}
+void LowerPH()
+{
+  digitalWrite(P_pump1Pin,HIGH);
+  Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
+  Serial1.println("output/pump1/state: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
+  delay(3000);
+  digitalWrite(P_pump1Pin,LOW);
+  Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
+}
+
 void pulse()   //measure the quantity of square wave
 {
   waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
@@ -95,6 +144,7 @@ void setup() {
   pinMode(P_pump2Pin, OUTPUT);
   pinMode(P_pump3Pin, OUTPUT);
   pinMode(P_pump4Pin, OUTPUT);
+  pinMode(EC_enable, OUTPUT);
   pinMode(WaterLevelPin, INPUT_PULLUP);
   pinMode(interruptPin, INPUT_PULLUP);
 
@@ -125,6 +175,7 @@ void setup() {
   Serial1.println("output/pump2/state: "+ String(digitalRead(P_pump2Pin)));
   Serial1.println("output/pump3/state: "+ String(digitalRead(P_pump3Pin)));
   Serial1.println("output/pump4/state: "+ String(digitalRead(P_pump4Pin)));
+  Serial1.println("output/EC_enable/state: "+ String(digitalRead(EC_enable)));
 
 
   ec.setCalibration(1.0572);//Replace the 1 with the calibrated K value if it's calibrated
@@ -145,6 +196,8 @@ void setup() {
 
 }
 
+
+
 void loop() {
 
   EC_Voltage = (uint32_t)analogRead(EC_PIN) * 5000 / 1024;
@@ -158,7 +211,7 @@ void loop() {
   Conductivity = float(ecAVG.reading(Conductivity));
 
   voltagePH = analogRead(PH_PIN)/1024.0*5000;
-  phValue = ph.readPH(voltagePH,Temp);
+  phValue = ph.readPH(voltagePH,Temp20);
   phValue = phValue*100;
   phValue = float(phAVG.reading(phValue))/100;
   phValue = phValue + PHoffset;
@@ -211,6 +264,8 @@ void loop() {
     Serial1.println("output/pump2/state: "+ String(digitalRead(P_pump2Pin)));
     Serial1.println("output/pump3/state: "+ String(digitalRead(P_pump3Pin)));
     Serial1.println("output/pump4/state: "+ String(digitalRead(P_pump4Pin)));
+    Serial1.println("output/EC_enable/state: "+ String(digitalRead(EC_enable)));
+    
 
     timeOfSerialSend = millis();
   }
@@ -252,58 +307,14 @@ void loop() {
       if (Name == "pump1CMD"){ SerialtoDigitalWrite(Val,P_pump1Pin);}
       if (Name == "pump2CMD"){ SerialtoDigitalWrite(Val,P_pump2Pin);}
       if (Name == "pump3CMD"){ SerialtoDigitalWrite(Val,P_pump3Pin);}
-      if (Name == "pump4CMD"){ SerialtoDigitalWrite(Val,P_pump4Pin);} 
+      if (Name == "pump4CMD"){ SerialtoDigitalWrite(Val,P_pump4Pin);}
+      if (Name == "EC_enableCMD"){ SerialtoDigitalWrite(Val,EC_enable);}
+
     }
     c=0;
     dataIn="";
   }
 }
 
-String manualModeLoop(String prev_Mode)
-{
-  if (prev_Mode == "Auto")
-  {
-    prev_Mode = "Manual";
-  }
-  return prev_Mode;
-}
 
-void SerialtoDigitalWrite(String Val, int PinNumber)
-{
-  if (Val == "1"){digitalWrite(PinNumber,HIGH);}
-  if (Val == "0"){digitalWrite(PinNumber,LOW);}
-} 
 
-void AddNutriant()
-{
-  digitalWrite(P_pump3Pin,HIGH);
-  Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
-  Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
-  delay(3000);
-  digitalWrite(P_pump3Pin,LOW);
-  Serial.println("pump3: " + String(digitalRead(P_pump3Pin)));
-  Serial1.println("output/pump3/state: " + String(digitalRead(P_pump3Pin))); //Send data to ESP32
-}
-void RaisePH()
-{
-  digitalWrite(P_pump2Pin,HIGH);
-  Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
-  Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); //Send data to ESP32
-  delay(3000);
-  digitalWrite(P_pump2Pin,LOW);
-  Serial.println("pump2: " + String(digitalRead(P_pump2Pin)));
-  Serial1.println("output/pump2/state: " + String(digitalRead(P_pump2Pin))); 
-}
-void LowerPH()
-{
-  digitalWrite(P_pump1Pin,HIGH);
-  Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
-  Serial1.println("output/pump1/state: " + String(digitalRead(P_pump1Pin))); //Send data to ESP32
-  delay(3000);
-  digitalWrite(P_pump1Pin,LOW);
-  Serial.println("output/pump1: " + String(digitalRead(P_pump1Pin)));
-}
-void pulse()   //measure the quantity of square wave
-{
-  waterFlow += 1.0 / 450.0; // 450 pulses for 1 liter (see product parameters)
-}
