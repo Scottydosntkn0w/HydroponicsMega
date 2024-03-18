@@ -65,14 +65,17 @@ int range_ec_high = 1300;
 int range_ec_low = 1000;
 //# Desired range for pH
 int range_ph_high = 6.4;
-int range_ph_low = 6.0;
+int range_ph_low = 5.5;
 //# pH range that will immediately cause a pH warning
 int range_ph_high_danger = 7.0;
 int range_ph_low_danger = 5.0;
 
 unsigned long startTime = millis();
+unsigned long ECReadDelay = 60000;
 unsigned long waterADJDelay = 300000;//300000;
 unsigned long timeOfADJ = millis();
+unsigned long timeOfRead = millis();
+unsigned long DurationSinceECREad = 0;
 unsigned long DurationSinceADJ = 0;
 unsigned long DurationSinceSerialSend = 0;
 unsigned long SerialSendDelay = 30000;
@@ -96,6 +99,15 @@ void SerialtoDigitalWrite(String Val, int PinNumber)
 {
   if (Val == "1"){digitalWrite(PinNumber,HIGH);}
   if (Val == "0"){digitalWrite(PinNumber,LOW);}
+  Serial1.println("sensor/WaterLevel: "+ String(WaterLevelState));
+  Serial1.println("output/Light/state: "+ String(digitalRead(lightPin)));
+  Serial1.println("output/Water Pump/state: "+ String(digitalRead(waterPumpPin)));
+  Serial1.println("output/pump1/state: "+ String(digitalRead(P_pump1Pin)));
+  Serial1.println("output/pump2/state: "+ String(digitalRead(P_pump2Pin)));
+  Serial1.println("output/pump3/state: "+ String(digitalRead(P_pump3Pin)));
+  Serial1.println("output/pump4/state: "+ String(digitalRead(P_pump4Pin)));
+  Serial1.println("output/EC_enable/state: "+ String(digitalRead(EC_enable)));
+
 } 
 
 void AddNutriant()
@@ -200,25 +212,35 @@ void setup() {
 
 void loop() {
 
-  EC_Voltage = (uint32_t)analogRead(EC_PIN) * 5000 / 1024;
-  TE_Voltage = (uint32_t)analogRead(TE_PIN) * 5000 / 1024;
 
-  Temp = ecpt.convVoltagetoTemperature_C((float)TE_Voltage/1000);
-  Temp = Temp * 100;
-  Temp = float(TempAVG.reading(Temp))/100;
-  
   Conductivity = ec.getEC_us_cm(EC_Voltage, Temp);
   Conductivity = float(ecAVG.reading(Conductivity));
 
-  voltagePH = analogRead(PH_PIN)/1024.0*5000;
-  phValue = ph.readPH(voltagePH,Temp20);
-  phValue = phValue*100;
-  phValue = float(phAVG.reading(phValue))/100;
-  phValue = phValue + PHoffset;
+  if (digitalRead(EC_enable) == HIGH)
+  {
+    EC_Voltage = (uint32_t)analogRead(EC_PIN) * 5000 / 1024;
+    TE_Voltage = (uint32_t)analogRead(TE_PIN) * 5000 / 1024;
 
+    Temp = ecpt.convVoltagetoTemperature_C((float)TE_Voltage/1000);
+    Temp = Temp * 100;
+    Temp = float(TempAVG.reading(Temp))/100;
+    Conductivity = ec.getEC_us_cm(EC_Voltage, Temp);
+    Conductivity = float(ecAVG.reading(Conductivity));
+  }
+
+  if (digitalRead(EC_enable) == LOW)
+  {
+    voltagePH = analogRead(PH_PIN)/1024.0*5000;
+    phValue = ph.readPH(voltagePH,Temp);
+    phValue = phValue*100;
+    phValue = float(phAVG.reading(phValue))/100;
+    phValue = phValue + PHoffset;
+  }
+  
   POWERsensorValue = analogRead(POWERsensorPin);
   WaterLevelState = digitalRead(WaterLevelPin);
 
+  DurationSinceECREad = millis() - timeOfRead;
   DurationSinceADJ = millis() - timeOfADJ;
   DurationSinceSerialSend = millis() - timeOfSerialSend;
 
@@ -241,12 +263,25 @@ void loop() {
     {
       if(Conductivity < range_ec_low){ AddNutriant();timeOfADJ = millis();}
       else if (phValue < range_ph_low){ RaisePH();timeOfADJ = millis();}
-      else if (phValue > range_ph_high){ LowerPH;timeOfADJ = millis();}
+      else if (phValue > range_ph_high){ LowerPH();timeOfADJ = millis();}
+    }
+
+
+    if(DurationSinceECREad > ECReadDelay)
+    {
+      timeOfRead = millis();
+      if (digitalRead(EC_enable) == HIGH)
+      {
+        digitalWrite(EC_enable,LOW);
+      }
+      if (digitalRead(EC_enable) == LOW)
+      {
+        digitalWrite(EC_enable,HIGH);
+      }
+      Serial1.println("output/EC_enable/state: "+ String(digitalRead(EC_enable)));
     }
 
   }
-
-
 //report (flow, ph, ec, temp, power, water level)
   if(DurationSinceSerialSend > SerialSendDelay)
   {
