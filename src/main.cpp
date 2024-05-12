@@ -269,12 +269,15 @@ void loop() {
 
     if(DurationSinceECREad > ECReadDelay)
     {
+      
       timeOfRead = millis();
-      if (digitalRead(EC_enable) == HIGH)
+      int ec_state = digitalRead(EC_enable);
+      
+      if (ec_state == 1)
       {
         digitalWrite(EC_enable,LOW);
       }
-      if (digitalRead(EC_enable) == LOW)
+      if (ec_state == 0)
       {
         digitalWrite(EC_enable,HIGH);
       }
